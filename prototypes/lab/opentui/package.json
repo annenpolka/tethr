@@ -1,0 +1,13 @@
+{
+  "name": "tethr-opentui-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/main.ts",
+    "build": "bun build src/main.ts --target=bun --packages=external --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test --timeout 15000"
+  },
+  "dependencies": { "@opentui/core": "0.5.11" },
+  "devDependencies": { "@types/bun": "1.4.0", "typescript": "5.9.3" }
+}

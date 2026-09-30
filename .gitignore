@@ -1,0 +1,13 @@
+.DS_Store
+prototypes/lab/runtime/
+prototypes/lab/**/node_modules/
+prototypes/lab/**/dist/
+prototypes/lab/**/target/
+prototypes/lab/**/.build/
+prototypes/lab/**/.cache/
+prototypes/lab/**/.runtime/
+prototypes/lab/**/.cargo-home/
+prototypes/lab/**/.bun-cache/
+prototypes/lab/**/.tmp/
+**/__pycache__/
+*.pyc

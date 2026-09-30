@@ -1,0 +1,16 @@
+{
+  "name": "tethr-lab-tauri",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build:web": "tsc --noEmit && vite build",
+    "build": "tauri build --bundles app",
+    "dev:native": "tauri dev",
+    "test": "bun test tests",
+    "test:rust": "cargo test --release --manifest-path src-tauri/Cargo.toml"
+  },
+  "dependencies": { "@tauri-apps/api": "^2" },
+  "devDependencies": { "@tauri-apps/cli": "^2", "@types/bun": "latest", "happy-dom": "latest", "typescript": "^5.9", "vite": "^7" }
+}

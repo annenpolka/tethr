@@ -1,0 +1,19 @@
+# Paneru v0.4.4: merge these named tables into ~/.paneru.toml.
+# Prepared only; this file does not apply the rules.
+# Match requires BOTH exact bundle_id and title regex.
+
+[windows.tethr_lab_native]
+bundle_id = "com.tethr.lab.native"
+title = ".*"
+floating = true
+
+[windows.tethr_lab_tauri]
+bundle_id = "com.tethr.lab.tauri"
+title = ".*"
+floating = true
+
+# Never float every Ghostty window. Keep this dedicated title stable.
+[windows.tethr_lab_opentui]
+bundle_id = "com.mitchellh.ghostty"
+title = "^tethr · OpenTUI$"
+floating = true

@@ -1,0 +1,6 @@
+{
+  "identifier": "main-window",
+  "description": "Local launcher UI may hide its own window.",
+  "windows": ["main"],
+  "permissions": ["core:default", "core:window:allow-hide"]
+}
