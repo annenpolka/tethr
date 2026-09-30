@@ -1,7 +1,7 @@
 # tethr：AIターミナルと横断ランチャーの先例から、何を作るか
 
 調査日：2026-09-30  
-対象：Warp、Raycast、Atuin、sesh、Consult、およびGhostty・tmuxの接続面  
+対象：Warp、Raycast、Atuin、sesh、Consult、Herdr、およびGhostty・tmuxの接続面  
 状態：公式資料に基づく比較と設計提案。製品の実機比較、インストール、課金、tethrの追加実装は行っていない。
 
 ---
@@ -27,7 +27,7 @@
 
 ---
 
-tethrの現在の目的は、必要な範囲でRaycastを代替し、手で窓を選ぶ操作を、ウィンドウ・tmux・ほかのセッションを横断する検索へ広げること。コマンド履歴、候補提示、AI補完、日本語の用事からの探索も重視する。全機能の複製や、独自端末・独自エージェントの開発自体は目的ではない。[現在の設計方針](../design.md)
+tethrの現在の目的は、必要な範囲でRaycastを代替し、手で窓を選ぶ操作を、ウィンドウ・tmux・Herdr等のセッションを横断する検索へ広げること。コマンド履歴、候補提示、AI補完、日本語の用事からの探索も重視する。全機能の複製や、独自端末・独自エージェントの開発自体は目的ではない。[現在の設計方針](../design.md)
 
 この目的に対する評価軸は次の通り。
 
@@ -76,6 +76,14 @@ MCP経由では外部AIが履歴や記録済み出力を検索できる。履歴
 seshはtmuxのセッションとzoxideのディレクトリを一覧化し、接続先がなければセッションを作れる。fzf等との組合せに加え、作者のRaycast拡張もある。作者READMEには拡張でtmuxの事前起動が必要なこと、短時間のキャッシュがあることが記載されている。[sesh README](https://github.com/joshmedeski/sesh)、[Raycast Store](https://www.raycast.com/joshmedeski/sesh)
 
 **示唆**：run-or-raiseに近いセッション接続と、端末外からの起動には先例がある。比較相手を「何も導入していない手作業」だけにすると、自作の価値を過大評価する。キャッシュされた候補が消えるケースも評価に含める。
+
+### Herdr：tmuxと並べて扱う、実際の接続対象
+
+2026-09-30追補：利用者の公式URL提示により、初版の仮転写「HaaD」は[Herdr](https://herdr.dev/)と特定した。tmuxと同じ第一級の横断検索・復帰対象として扱う。これは利用者が確認した方向性であり、以下の接続方式の採用決定とは分ける。
+
+Herdrは既存のGhosttyやiTerm内で使える独立したruntimeであり、tmuxそのものではない。sessionはserverの名前空間で、その中にworkspace、tab、paneを持つ。[公式比較](https://herdr.dev/compare/)、[Concepts](https://herdr.dev/docs/concepts/)
+
+**示唆**：Herdrを単なるAI補完先として扱わず、既存の作業を発見して戻る供給元にする。Herdr内部のworkspaceをtethr独自の必須プロジェクト登録単位へ変換する必要はない。
 
 ### Consult：Emacsらしい統一感を、構造として参考にする
 
@@ -156,9 +164,23 @@ tmuxには対象IDとclientを指定した切り替えがある。IDはそのtmu
 | 入力・実行 | 正確な宛先、cwd、コマンド、配置か実行か | 確認後の対象変更なら再確認 |
 | 結果観測 | 実際の前面状態、選択pane、入力先、処理結果 | 要求成功と実結果を分ける |
 
-tmuxではsocket/serverとpane IDを組にするなど、名前だけに依存しない識別を検討する。Ghostty terminalとtmux clientをどう対応付けるかは未検証。HaaDは正式名称・API自体が未確認であり、同じ接続方法を当てはめない。
+tmuxではsocket/serverとpane IDを組にするなど、名前だけに依存しない識別を検討する。Ghostty terminalとtmux clientをどう対応付けるかは未検証。Herdrも同じ第一級の対象だが、providerごとのID・状態・対応機能は保持し、tmuxと同じ接続方法を当てはめない。
 
 AIが提案したコマンドの妥当性と、それが正しい宛先に届くことは別の問題である。良い補完モデルでも後者を解決しない。
+
+### Herdr連携の段階案
+
+**公式に確認できた接続面**：session一覧・attach、workspace/tab/pane/agent一覧、agent focus/attach、terminal attachがある。実binaryの契約は `herdr api schema --json` で照合できる。remote指定では転送できる操作に制限があり、対話的attachがそのまま転送されると仮定しない。[CLI Reference](https://herdr.dev/docs/cli-reference/)
+
+**提案**：最初はCLI adapterで候補取得と復帰を分けて試す。識別子はprovider・machine・session/serverの名前空間と組にし、同名や再起動後の対象を取り違えない。キャッシュした宛先を操作直前に確認し、未対応操作は無効にする。既存のcontrollerを奪うtakeoverは通常の復帰と区別する。
+
+継続更新が必要ならsocket APIを比較する。`herdr api snapshot`／`session.snapshot` は初期取得に使え、`events.subscribe` は継続通知を提供する。再接続や `events_lost` では再購読・snapshot取得・正規の再読込で整合させる。snapshotとeventsに共通の順序境界はなく、古いeventをsnapshotへ無条件に再適用しない。[Socket API](https://herdr.dev/docs/socket-api/)
+
+Herdrのagent状態はworking、blocked、idle、done、unknownを保つ。unknownを完了へ丸めない。focusは「見た」状態にも影響し得るため、検索のプレビューだけでfocusを実行しない案とする。[Agent Automation](https://herdr.dev/docs/agent-automation/)
+
+**継続と復元の区別**：detach後の再attachは稼働中プロセスへの復帰。通常のserver再起動では元のプロセスは失われ、layout復元と、対応agentのnative session再開は別経路になる。pane画面履歴は任意のshell履歴DBではなく、AI補完用のコマンド履歴と同一視しない。[Session State and Restore](https://herdr.dev/docs/session-state/)
+
+**未検証**：Herdr内focusとmacOSのホスト窓前面化をつなぐ方法、利用端末との対応付け、実binaryのバージョン・権限・競合時の挙動。OS run-or-raise、deeplink、MCPについて公式の有無は今回確定していない。CLI/socketの存在から、それらが使えると推測しない。Native / Tauri / OpenTUIの選定にも直結させない。
 
 ---
 
@@ -189,19 +211,20 @@ AIが提案したコマンドの妥当性と、それが正しい宛先に届く
 | Warpアプリを使う | 端末内の検索・AI・保存手順を一体で試せる | 既存環境からの移行、外部窓の扱い | 端末内だけで主要な用事が済む |
 | Ghostty等でWarp CLIを使う | 端末アプリを維持してAIを試せる | 独自PTYと既存tmux作業の関係、会話の選択導線 | 主な不足がAI支援である |
 | Raycast＋sesh等を組み合わせる | デスクトップ入口とtmux接続の先例を利用できる | 対応端末、キャッシュ、複数窓の正確な復帰 | 設定や小さな拡張で必要な往復が満たせる |
+| Herdrを第一級の接続先にする | 現在のagent作業をtmuxと同じ入口から探せる | 名前空間、attach能力、Mac窓との対応、状態更新 | tmuxと並ぶ対象として確定。接続方式は実機検証で選ぶ |
 | Atuinを履歴・AIの供給元にする | 履歴の文脈と検索を再利用できる | 対象cwd/sessionの伝達、出力取得の準備、API境界 | コマンド想起が主要な障害 |
 | tethrを薄い統合UIとして作る | 窓・session・履歴の接続を本人の操作に合わせられる | OS権限、対象の同一性、失敗処理、保守 | 既存の組合せより往復が明確に短くなる |
 | 端末・履歴・AIまで全面自作 | 全層を変更できる | 最大の実装・保守範囲 | 現時点では必要性の証拠が不足 |
 
 ### 暫定推薦
 
-1. 「戻る」最小経路を、AIなしで設計する。一般アプリ、Ghosttyの窓、tmuxのpaneを混同しない。
+1. 「戻る」最小経路を、AIなしで設計する。一般アプリ、Ghosttyの窓、tmux、Herdrを候補にし、provider別の対象と復帰方法を区別する。
 2. コマンド検索では、Atuin等の既存履歴と小さな登録済み候補を比較する。
 3. AI補完は明示的な別操作として試す。日本語の用事、候補の修正、宛先確認までを同じ試験に入れる。
 4. Warp CLIやRaycast＋seshを実際の比較相手にし、自作する範囲を減らせるか確認する。
 5. Native / Tauri / OpenTUIは、この往復を同条件で行った後に判断する。
 
-「外部文脈を横断すること」は検証仮説であり、他製品に不可能な独自機能と主張するものではない。HaaDを含む本人の作業環境で、短く確実に使えることを評価する。
+「外部文脈を横断すること」は検証仮説であり、他製品に不可能な独自機能と主張するものではない。Herdrを含む本人の作業環境で、短く確実に使えることを評価する。
 
 ---
 
@@ -219,6 +242,7 @@ AIが提案したコマンドの妥当性と、それが正しい宛先に届く
 | :--- | :--- | :--- |
 | 同名候補から目的の窓／paneへ戻る | 到達時間、操作数、誤選択、実際のID | 既存手段と同等以下なら統合UIの範囲を縮める |
 | 起動済み／未起動を続けて呼ぶ | 窓・プロセスの増分、前面状態 | 不要な複製が出れば復帰仕様を修正 |
+| tmux／Herdrの同名対象を切り替える | provider・machine・session・paneの対応、実際の入力先 | 違うruntimeへの誤配送は不合格 |
 | 選択後に対象が消える | 送信件数、エラー表示、別対象への誤配送 | 誤配送は不合格 |
 | 日本語IMEで候補を探す | 変換確定と実行のイベント | 変換Enterで実行されたら不合格 |
 | 履歴から選び直して使う | 対象cwd、候補の出所、編集回数 | 文脈がずれるなら検索範囲の契約を修正 |
@@ -228,7 +252,7 @@ AIが提案したコマンドの妥当性と、それが正しい宛先に届く
 
 ### 未解決の判断
 
-- HaaDの正式名称、対象セッションの識別・再開方法
+- Herdrの実環境での識別・attach・focusと、Macの該当窓への復帰
 - 本人にとって頻度の高い最初の一往復
 - Atuin等を導入済みか、既存履歴をどう扱うか
 - ウィンドウ・tmux client・エージェント会話の対応付け
@@ -250,6 +274,7 @@ AIが提案したコマンドの妥当性と、それが正しい宛先に届く
 - Warp：[Workflows](https://docs.warp.dev/knowledge-and-collaboration/warp-drive/workflows)、[Prompts](https://docs.warp.dev/knowledge-and-collaboration/warp-drive/prompts)、[Credits](https://docs.warp.dev/support-and-community/plans-and-billing/credits)、[Pricing FAQ](https://docs.warp.dev/support-and-community/plans-and-billing/pricing-faqs)
 - Raycast：[Quickstart](https://manual.raycast.com/quickstart)、[Search Bar](https://manual.raycast.com/search-bar)、[Billing](https://manual.raycast.com/billing)、[Usage Limits](https://manual.raycast.com/ai/usage-limits)
 - Atuin：[概要](https://docs.atuin.sh/18.19/)、[AI](https://docs.atuin.sh/18.19/ai/introduction/)、[MCP](https://docs.atuin.sh/18.19/ai/mcp/)、[Self Hosting](https://docs.atuin.sh/18.19/ai/self-hosting/)
+- Herdr：[Concepts](https://herdr.dev/docs/concepts/)、[CLI](https://herdr.dev/docs/cli-reference/)、[Socket API](https://herdr.dev/docs/socket-api/)、[Agent Automation](https://herdr.dev/docs/agent-automation/)、[Session State](https://herdr.dev/docs/session-state/)、[公式比較](https://herdr.dev/compare/)
 - セッションと検索：[sesh](https://github.com/joshmedeski/sesh)、[sesh Raycast拡張](https://www.raycast.com/joshmedeski/sesh)、[Consult](https://github.com/minad/consult#multiple-sources)
 - 接続面：[Ghostty AppleScript](https://ghostty.org/docs/features/applescript)、[tmux manual](https://man.openbsd.org/tmux.1)
 - tethr：[設計ノート](../design-notes/unified-search-2026-09-30.md)、[比較試作の検証記録](prototypes-2026-09-12.md)
